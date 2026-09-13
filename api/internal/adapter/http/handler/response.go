@@ -1,0 +1,40 @@
+package handler
+
+import (
+	"errors"
+	"net/http"
+
+	"food-store-apis/internal/adapter/http/dto"
+	"food-store-apis/internal/domain/apperror"
+
+	"github.com/gin-gonic/gin"
+)
+
+func success(c *gin.Context, msg string, data interface{}) {
+	c.JSON(http.StatusOK, dto.Response{Code: 0, Msg: msg, Data: data})
+}
+
+// failure writes an error response. If msg is empty, the message is derived
+// from err (the AppError message, or err.Error() as a fallback).
+func failure(c *gin.Context, msg string, err error) {
+	var appErr *apperror.AppError
+	if errors.As(err, &appErr) {
+		status := http.StatusInternalServerError
+		switch appErr.Code {
+		case apperror.CodeNotFound:
+			status = http.StatusNotFound
+		case apperror.CodeInvalid:
+			status = http.StatusBadRequest
+		}
+		if msg == "" {
+			msg = appErr.Message
+		}
+		c.JSON(status, dto.Response{Code: 1, Msg: msg})
+		return
+	}
+
+	if msg == "" {
+		msg = err.Error()
+	}
+	c.JSON(http.StatusInternalServerError, dto.Response{Code: 1, Msg: msg})
+}

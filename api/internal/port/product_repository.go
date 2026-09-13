@@ -7,7 +7,7 @@ import (
 )
 
 type ProductRepository interface {
-	GetByID(ctx context.Context, id int64) (*model.Product, error)
+	GetByID(ctx context.Context, id string) (*model.Product, error)
 	List(ctx context.Context) ([]*model.Product, error)
 	Create(ctx context.Context, product *model.Product) error
 }

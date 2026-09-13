@@ -1,24 +1,19 @@
 package http
 
 import (
-	"net/http"
-	"strconv"
+	"food-store-apis/internal/adapter/http/handler"
+
+	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(products *ProductHandler, orders *OrderHandler) *http.ServeMux {
-	mux := http.NewServeMux()
+func NewRouter(products *handler.ProductHandler, orders *handler.OrderHandler) *gin.Engine {
+	r := gin.Default()
 
-	mux.HandleFunc("GET /products", products.List)
+	v1 := r.Group("/api/v1")
+	{
+		v1.GET("/products", products.List)
+		v1.POST("/order", orders.Create)
+	}
 
-	mux.HandleFunc("POST /orders", orders.Create)
-	mux.HandleFunc("GET /orders/{id}", func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			http.Error(w, "invalid order id", http.StatusBadRequest)
-			return
-		}
-		orders.Get(w, r, id)
-	})
-
-	return mux
+	return r
 }

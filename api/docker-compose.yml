@@ -1,0 +1,21 @@
+name: foodstoretest
+services:
+  foodstore_pgdb:
+    image: postgres:17
+    container_name: foodstoretest_container
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: $DATABASE_USERNAME
+      POSTGRES_PASSWORD: $DATABASE_PASSWORD
+      POSTGRES_DB: $DATABASE_NAME$APP_ENV
+    networks:
+      - foodstoretest_nt
+    env_file:
+      - .env
+    volumes:
+      - postgres_dt:/var/lib/postgresql/data
+networks:
+  foodstoretest_nt:
+volumes:
+  postgres_dt:

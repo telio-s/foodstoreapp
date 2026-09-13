@@ -1,0 +1,152 @@
+openapi: 3.0.3
+info:
+  title: Food Store API
+  description: Point-of-sale API for browsing products and placing orders.
+  version: "1.0.0"
+servers:
+  - url: /api/v1
+paths:
+  /products:
+    get:
+      summary: List products
+      operationId: listProducts
+      tags: [products]
+      responses:
+        "200":
+          description: List of available products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProductsResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /order:
+    post:
+      summary: Create an order
+      operationId: createOrder
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOrderResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+        name:
+          type: string
+          example: "Cheeseburger"
+        price:
+          type: string
+          example: "5.99"
+    ListProductsResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        msg:
+          type: string
+          example: ""
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Product"
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 1
+        msg:
+          type: string
+          example: "product not found"
+    CreateOrderItemRequest:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id:
+          type: string
+          example: "1"
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+    CreateOrderRequest:
+      type: object
+      required: [items]
+      properties:
+        member_card_number:
+          type: string
+          example: "MC-1001"
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CreateOrderItemRequest"
+    CreateOrderProductItem:
+      type: object
+      properties:
+        product_id:
+          type: string
+          example: "1"
+        product_name:
+          type: string
+          example: "Cheeseburger"
+        quantity:
+          type: integer
+          example: 2
+    CreateOrderResponse:
+      type: object
+      properties:
+        order_id:
+          type: string
+          example: "1001"
+        total_price:
+          type: string
+          example: "11.98"
+        discount_amount:
+          type: string
+          example: "0.00"
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOrderProductItem"

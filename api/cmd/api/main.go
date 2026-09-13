@@ -1,37 +1,54 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	adapterhttp "food-store-apis/internal/adapter/http"
-	"food-store-apis/internal/adapter/repository"
+	"food-store-apis/internal/adapter/http/handler"
+	"food-store-apis/internal/docs"
 	"food-store-apis/internal/domain/service"
 	"food-store-apis/internal/infra/config"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/fx"
 )
 
 func main() {
-	cfg := config.Load()
+	fx.New(
+		fx.Provide(
+			config.Load,
+			service.NewProductService,
+			service.NewOrderService,
+			handler.NewProductHandler,
+			handler.NewOrderHandler,
+			adapterhttp.NewRouter,
+		),
+		fx.Invoke(registerHTTPServer),
+	).Run()
+}
 
-	db, err := repository.NewPostgresDB(cfg.DBDSN)
-	if err != nil {
-		log.Fatalf("connect to db: %v", err)
+func registerHTTPServer(lc fx.Lifecycle, cfg *config.Config, router *gin.Engine) {
+	docs.RegisterRoutes(router)
+
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: router,
 	}
-	defer db.Close()
 
-	productRepo := repository.NewProductRepository(db)
-	orderRepo := repository.NewOrderRepository(db)
-
-	productService := service.NewProductService(productRepo)
-	orderService := service.NewOrderService(orderRepo, productRepo)
-
-	productHandler := adapterhttp.NewProductHandler(productService)
-	orderHandler := adapterhttp.NewOrderHandler(orderService)
-
-	router := adapterhttp.NewRouter(productHandler, orderHandler)
-
-	log.Printf("listening on :%s", cfg.Port)
-	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
-		log.Fatal(err)
-	}
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				log.Printf("listening on :%s", cfg.Port)
+				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Fatalf("http server error: %v", err)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return srv.Shutdown(ctx)
+		},
+	})
 }

@@ -3,18 +3,19 @@ package model
 import "time"
 
 type Order struct {
-	ID               int64
+	ID               string
 	MemberCardNumber string
-	TotalPrice       float64
-	DiscountAmount   float64
+	TotalPrice       string
+	DiscountAmount   string
 	CreatedAt        time.Time
 	Items            []*OrderItem
 }
 
 type OrderItem struct {
-	ID        int64
-	OrderID   int64
-	ProductID int64
-	Quantity  int
-	UnitPrice float64
+	ID          string
+	OrderID     string
+	ProductID   string
+	ProductName string
+	Quantity    int
+	UnitPrice   string
 }

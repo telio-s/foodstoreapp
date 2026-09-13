@@ -7,6 +7,6 @@ import (
 )
 
 type OrderRepository interface {
-	GetByID(ctx context.Context, id int64) (*model.Order, error)
+	GetByID(ctx context.Context, id string) (*model.Order, error)
 	Create(ctx context.Context, order *model.Order) error
 }
