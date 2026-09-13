@@ -14,3 +14,5 @@ sql:
         overrides:
           - db_type: "pg_catalog.numeric"
             go_type: "string"
+          - db_type: "uuid"
+            go_type: "string"

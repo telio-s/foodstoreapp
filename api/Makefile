@@ -6,7 +6,7 @@ DB_DSN := postgres://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@$(DATABASE_HOST):
 
 MIGRATE := migrate -path $(MIGRATIONS_DIR) -database "$(DB_DSN)"
 
-.PHONY: migrate-install migrate-new migrate-up migrate-down migrate-down-all migrate-force migrate-version schema-dump
+.PHONY: migrate-install migrate-new migrate-up migrate-down migrate-down-all migrate-force migrate-version schema-dump sqlc-install sqlc-generate
 
 ## Install the golang-migrate CLI (postgres driver only).
 migrate-install:
@@ -43,3 +43,11 @@ schema-dump:
 	docker compose exec -T foodstore_pgdb pg_dump --schema-only --no-owner --no-privileges --no-comments \
 		-U $(DATABASE_USERNAME) -d $(DATABASE_NAME)$(APP_ENV) \
 		-T schema_migrations > db/schema.sql
+
+## Install the sqlc CLI.
+sqlc-install:
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+## Regenerate Go code from db/schema.sql + db/query into internal/adapter/postgres.
+sqlc-generate:
+	sqlc generate

@@ -9,7 +9,7 @@ import (
 )
 
 type Order struct {
-	ID               int32              `json:"id"`
+	ID               string             `json:"id"`
 	MemberCardNumber *string            `json:"member_card_number"`
 	TotalPrice       string             `json:"total_price"`
 	DiscountAmount   string             `json:"discount_amount"`
@@ -17,15 +17,15 @@ type Order struct {
 }
 
 type OrderItem struct {
-	ID        int32  `json:"id"`
-	OrderID   int32  `json:"order_id"`
-	ProductID int32  `json:"product_id"`
+	ID        string `json:"id"`
+	OrderID   string `json:"order_id"`
+	ProductID string `json:"product_id"`
 	Quantity  int32  `json:"quantity"`
 	UnitPrice string `json:"unit_price"`
 }
 
 type Product struct {
-	ID    int32  `json:"id"`
+	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Price string `json:"price"`
 }

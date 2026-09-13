@@ -26,32 +26,12 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.order_items (
-    id integer NOT NULL,
-    order_id integer NOT NULL,
-    product_id integer NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    order_id uuid NOT NULL,
+    product_id uuid NOT NULL,
     quantity integer NOT NULL,
-    unit_price numeric(10,2) NOT NULL
+    unit_price text NOT NULL
 );
-
-
---
--- Name: order_items_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.order_items_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: order_items_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.order_items_id_seq OWNED BY public.order_items.id;
 
 
 --
@@ -59,32 +39,12 @@ ALTER SEQUENCE public.order_items_id_seq OWNED BY public.order_items.id;
 --
 
 CREATE TABLE public.orders (
-    id integer NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     member_card_number text,
-    total_price numeric(10,2) NOT NULL,
-    discount_amount numeric(10,2) DEFAULT 0 NOT NULL,
+    total_price text NOT NULL,
+    discount_amount text DEFAULT '0'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
-
---
--- Name: orders_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.orders_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.orders_id_seq OWNED BY public.orders.id;
 
 
 --
@@ -92,51 +52,10 @@ ALTER SEQUENCE public.orders_id_seq OWNED BY public.orders.id;
 --
 
 CREATE TABLE public.products (
-    id integer NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     name text NOT NULL,
-    price numeric(10,2) NOT NULL
+    price text NOT NULL
 );
-
-
---
--- Name: products_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.products_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: products_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.products_id_seq OWNED BY public.products.id;
-
-
---
--- Name: order_items id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.order_items ALTER COLUMN id SET DEFAULT nextval('public.order_items_id_seq'::regclass);
-
-
---
--- Name: orders id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.orders ALTER COLUMN id SET DEFAULT nextval('public.orders_id_seq'::regclass);
-
-
---
--- Name: products id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.products ALTER COLUMN id SET DEFAULT nextval('public.products_id_seq'::regclass);
 
 
 --

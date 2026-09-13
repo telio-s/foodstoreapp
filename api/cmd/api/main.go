@@ -7,11 +7,13 @@ import (
 
 	adapterhttp "food-store-apis/internal/adapter/http"
 	"food-store-apis/internal/adapter/http/handler"
+	"food-store-apis/internal/adapter/postgres"
 	"food-store-apis/internal/docs"
 	"food-store-apis/internal/domain/service"
 	"food-store-apis/internal/infra/config"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/fx"
 )
 
@@ -19,6 +21,8 @@ func main() {
 	fx.New(
 		fx.Provide(
 			config.Load,
+			providePostgresPool,
+			postgres.NewProductRepository,
 			service.NewProductService,
 			service.NewOrderService,
 			handler.NewProductHandler,
@@ -29,7 +33,21 @@ func main() {
 	).Run()
 }
 
-func registerHTTPServer(lc fx.Lifecycle, cfg *config.Config, router *gin.Engine) {
+func providePostgresPool(cfg *config.Config) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(context.Background(), cfg.DBDSN)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
+		return nil, err
+	}
+
+	return pool, nil
+}
+
+func registerHTTPServer(lc fx.Lifecycle, cfg *config.Config, router *gin.Engine, pool *pgxpool.Pool) {
 	docs.RegisterRoutes(router)
 
 	srv := &http.Server{
@@ -48,6 +66,7 @@ func registerHTTPServer(lc fx.Lifecycle, cfg *config.Config, router *gin.Engine)
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			pool.Close()
 			return srv.Shutdown(ctx)
 		},
 	})
