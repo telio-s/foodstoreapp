@@ -3,6 +3,7 @@ services:
   foodstore_pgdb:
     image: postgres:17
     container_name: foodstoretest_container
+    restart: unless-stopped
     ports:
       - 5432:5432
     environment:

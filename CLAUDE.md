@@ -93,3 +93,21 @@ erDiagram
 - **products** — catalog of items available for purchase (`id`, `name`, `price`).
 - **orders** — a completed purchase (`id`, `member_card_number`, `total_price`, `discount_amount`, `created_at`).
 - **order_items** — line items belonging to an order, linking an order to a product with the `quantity` and `unit_price` at time of purchase (`id`, `order_id` FK → `orders.id`, `product_id` FK → `products.id`, `quantity`, `unit_price`).
+
+## Business Rules
+
+### Order discounts
+
+`domain/service.calculateDiscount` (in `order_service.go`, called from `CreateOrder`) applies two independent discount rules whenever an order is created. Both are computed against the pre-discount subtotal and summed — they do not compound:
+
+1. **Pair discount (5%)** — for `Orange`, `Pink`, and `Green` products specifically (matched by product name), every complete pair of the *same* product ordered gets 5% off that pair's subtotal (`2 × unit_price × 5%`). A leftover odd unit is charged at full price, and quantities of the same product across multiple order lines are combined before pairing.
+
+   ```
+   Orange x2 = (120 + 120) - 5%
+   Pink   x4 = (80 + 80 - 5%) + (80 + 80 - 5%)
+   Green  x3 = (40 + 40 - 5%) + 40
+   ```
+
+2. **Member discount (10%)** — an additional 10% off the full order subtotal whenever `member_card_number` is provided (non-empty) on the order request. There is currently no format/existence validation of the card number — any non-empty value qualifies.
+
+`discount_amount = pair_discount + member_discount`, and `total_price = subtotal - discount_amount`, both rounded to 2 decimal places.

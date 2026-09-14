@@ -33,7 +33,7 @@ FROM products
 WHERE id = $1
 `
 
-func (q *Queries) GetProductByID(ctx context.Context, id int32) (Product, error) {
+func (q *Queries) GetProductByID(ctx context.Context, id string) (Product, error) {
 	row := q.db.QueryRow(ctx, getProductByID, id)
 	var i Product
 	err := row.Scan(&i.ID, &i.Name, &i.Price)

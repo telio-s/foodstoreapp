@@ -18,5 +18,4 @@ type CreateOrderInput struct {
 
 type OrderService interface {
 	CreateOrder(ctx context.Context, input CreateOrderInput) (*model.Order, error)
-	GetOrder(ctx context.Context, id string) (*model.Order, error)
 }

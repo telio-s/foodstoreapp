@@ -41,8 +41,8 @@ RETURNING id, order_id, product_id, quantity, unit_price
 `
 
 type CreateOrderItemParams struct {
-	OrderID   int32  `json:"order_id"`
-	ProductID int32  `json:"product_id"`
+	OrderID   string `json:"order_id"`
+	ProductID string `json:"product_id"`
 	Quantity  int32  `json:"quantity"`
 	UnitPrice string `json:"unit_price"`
 }
@@ -71,7 +71,7 @@ FROM orders
 WHERE id = $1
 `
 
-func (q *Queries) GetOrderByID(ctx context.Context, id int32) (Order, error) {
+func (q *Queries) GetOrderByID(ctx context.Context, id string) (Order, error) {
 	row := q.db.QueryRow(ctx, getOrderByID, id)
 	var i Order
 	err := row.Scan(
@@ -90,7 +90,7 @@ FROM order_items
 WHERE order_id = $1
 `
 
-func (q *Queries) ListOrderItemsByOrderID(ctx context.Context, orderID int32) ([]OrderItem, error) {
+func (q *Queries) ListOrderItemsByOrderID(ctx context.Context, orderID string) ([]OrderItem, error) {
 	rows, err := q.db.Query(ctx, listOrderItemsByOrderID, orderID)
 	if err != nil {
 		return nil, err
