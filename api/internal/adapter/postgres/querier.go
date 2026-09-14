@@ -9,6 +9,15 @@ import (
 )
 
 type Querier interface {
+	// Atomically claims a limited product for an order: last_order_at is only
+	// advanced to now() if the product is actually limited and its previous
+	// last_order_at (if any) is already outside the 1-hour cooldown. Postgres
+	// locks the row for the duration of this statement, so a concurrent claim
+	// for the same product waits for this transaction to commit or roll back,
+	// then re-evaluates the WHERE clause against the now-committed value --
+	// exactly one concurrent claimant can ever win within a given hour.
+	// Zero rows returned means the product is still in its cooldown window.
+	ClaimLimitedProduct(ctx context.Context, id string) (Product, error)
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
 	CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (OrderItem, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)

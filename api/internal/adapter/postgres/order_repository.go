@@ -10,6 +10,10 @@ import (
 )
 
 type orderRepository struct {
+	// pool is set only when q is not already bound to an externally
+	// managed transaction (see newTxOrderRepository / UnitOfWork.Execute).
+	// When set, Create opens and manages its own transaction so the order
+	// and its items are still written atomically on their own.
 	pool *pgxpool.Pool
 	q    *Queries
 }
@@ -18,15 +22,34 @@ func NewOrderRepository(pool *pgxpool.Pool) port.OrderRepository {
 	return &orderRepository{pool: pool, q: New(pool)}
 }
 
+// newTxOrderRepository returns an OrderRepository whose Create executes
+// directly against q instead of opening its own transaction, so it composes
+// with sibling writes (e.g. ProductRepository.UpdateLastOrderAt) made under
+// the same caller-managed transaction. Used by UnitOfWork.Execute.
+func newTxOrderRepository(q *Queries) port.OrderRepository {
+	return &orderRepository{q: q}
+}
+
 func (r *orderRepository) Create(ctx context.Context, order *model.Order) error {
+	if r.pool == nil {
+		return r.insert(ctx, r.q, order)
+	}
+
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	q := r.q.WithTx(tx)
+	if err := r.insert(ctx, r.q.WithTx(tx), order); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
 
+// insert writes order and its items using q, without making any decision
+// about transaction boundaries -- that's Create's job.
+func (r *orderRepository) insert(ctx context.Context, q *Queries, order *model.Order) error {
 	row, err := q.CreateOrder(ctx, CreateOrderParams{
 		MemberCardNumber: nullableString(order.MemberCardNumber),
 		TotalPrice:       order.TotalPrice,
@@ -52,7 +75,7 @@ func (r *orderRepository) Create(ctx context.Context, order *model.Order) error 
 		item.OrderID = itemRow.OrderID
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 func (r *orderRepository) GetByID(ctx context.Context, id string) (*model.Order, error) {

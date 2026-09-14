@@ -8,7 +8,7 @@ import "food-store-apis/internal/domain/apperror"
 // importing the domain package directly.
 type (
 	AppError = apperror.AppError
-	Code      = apperror.Code
+	Code     = apperror.Code
 )
 
 const (

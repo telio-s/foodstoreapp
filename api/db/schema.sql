@@ -54,7 +54,9 @@ CREATE TABLE public.orders (
 CREATE TABLE public.products (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name text NOT NULL,
-    price text NOT NULL
+    price text NOT NULL,
+    is_limited boolean DEFAULT false NOT NULL,
+    last_order_at timestamp with time zone
 );
 
 

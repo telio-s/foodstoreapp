@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
+	"time"
 
 	"food-store-apis/internal/domain/apperror"
 	"food-store-apis/internal/domain/model"
@@ -11,7 +13,8 @@ import (
 )
 
 func TestCreateOrder_NoItems_ReturnsInvalid(t *testing.T) {
-	svc := NewOrderService(newFakeProductRepository(), &fakeOrderRepository{}, testLogger())
+	products := newFakeProductRepository()
+	svc := NewOrderService(products, newFakeUnitOfWork(&fakeOrderRepository{}, products), testLogger())
 
 	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{})
 
@@ -22,7 +25,8 @@ func TestCreateOrder_NoItems_ReturnsInvalid(t *testing.T) {
 }
 
 func TestCreateOrder_ProductNotFound_ReturnsNotFound(t *testing.T) {
-	svc := NewOrderService(newFakeProductRepository(), &fakeOrderRepository{}, testLogger())
+	products := newFakeProductRepository()
+	svc := NewOrderService(products, newFakeUnitOfWork(&fakeOrderRepository{}, products), testLogger())
 
 	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
 		Items: []port.CreateOrderItemInput{{ProductID: "missing", Quantity: 1}},
@@ -37,7 +41,7 @@ func TestCreateOrder_ProductNotFound_ReturnsNotFound(t *testing.T) {
 func TestCreateOrder_PersistsAndReturnsComputedOrder(t *testing.T) {
 	products := newFakeProductRepository(blue)
 	orders := &fakeOrderRepository{}
-	svc := NewOrderService(products, orders, testLogger())
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
 
 	order, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
 		MemberCardNumber: "",
@@ -64,7 +68,7 @@ func TestCreateOrder_PersistsAndReturnsComputedOrder(t *testing.T) {
 func TestCreateOrder_AppliesPairAndMemberDiscounts(t *testing.T) {
 	products := newFakeProductRepository(orange, pink, green, blue)
 	orders := &fakeOrderRepository{}
-	svc := NewOrderService(products, orders, testLogger())
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
 
 	order, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
 		MemberCardNumber: "MC-1001",
@@ -94,7 +98,7 @@ func TestCreateOrder_AppliesPairAndMemberDiscounts(t *testing.T) {
 func TestCreateOrder_RepositoryError_ReturnsInternal(t *testing.T) {
 	products := newFakeProductRepository(blue)
 	orders := &fakeOrderRepository{createErr: errors.New("db down")}
-	svc := NewOrderService(products, orders, testLogger())
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
 
 	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
 		Items: []port.CreateOrderItemInput{{ProductID: "blue", Quantity: 1}},
@@ -103,6 +107,143 @@ func TestCreateOrder_RepositoryError_ReturnsInternal(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != apperror.CodeInternal {
 		t.Fatalf("expected CodeInternal error, got %v", err)
+	}
+}
+
+func TestCreateOrder_LimitedProductOrderedWithinWindow_ReturnsInvalid(t *testing.T) {
+	recentlyOrdered := time.Now().Add(-30 * time.Minute)
+	limitedRed := &model.Product{ID: "red", Name: "Red", Price: "50.00", IsLimited: true, LastOrderAt: &recentlyOrdered}
+
+	products := newFakeProductRepository(limitedRed)
+	orders := &fakeOrderRepository{}
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
+
+	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
+		Items: []port.CreateOrderItemInput{{ProductID: "red", Quantity: 1}},
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.CodeInvalid || appErr.ErrorCode != apperror.ErrProductLimited.ErrorCode {
+		t.Fatalf("expected ErrProductLimited, got %v", err)
+	}
+	if orders.created != nil {
+		t.Errorf("order should not have been persisted")
+	}
+}
+
+func TestCreateOrder_LimitedProductOrderedOutsideWindow_Allowed(t *testing.T) {
+	orderedLongAgo := time.Now().Add(-2 * time.Hour)
+	limitedRed := &model.Product{ID: "red", Name: "Red", Price: "50.00", IsLimited: true, LastOrderAt: &orderedLongAgo}
+
+	products := newFakeProductRepository(limitedRed)
+	orders := &fakeOrderRepository{}
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
+
+	order, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
+		Items: []port.CreateOrderItemInput{{ProductID: "red", Quantity: 1}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if orders.created != order {
+		t.Errorf("order was not persisted via the repository")
+	}
+}
+
+func TestCreateOrder_LimitedProductNeverOrdered_Allowed(t *testing.T) {
+	neverOrderedRed := &model.Product{ID: "red", Name: "Red", Price: "50.00", IsLimited: true}
+
+	products := newFakeProductRepository(neverOrderedRed)
+	orders := &fakeOrderRepository{}
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
+
+	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
+		Items: []port.CreateOrderItemInput{{ProductID: "red", Quantity: 1}},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreateOrder_SuccessfulOrder_UpdatesLastOrderAtForLimitedProducts(t *testing.T) {
+	orderedLongAgo := time.Now().Add(-2 * time.Hour)
+	limitedRed := &model.Product{ID: "red", Name: "Red", Price: "50.00", IsLimited: true, LastOrderAt: &orderedLongAgo}
+
+	products := newFakeProductRepository(limitedRed, blue)
+	orders := &fakeOrderRepository{}
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
+
+	before := time.Now()
+	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
+		Items: []port.CreateOrderItemInput{
+			{ProductID: "red", Quantity: 1},
+			{ProductID: "blue", Quantity: 1},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	claimedAt, ok := products.claimedAt["red"]
+	if !ok {
+		t.Fatalf("expected ClaimLimitedProduct to be called for the limited product")
+	}
+	if claimedAt.Before(before) {
+		t.Errorf("last_order_at = %v, want a time at or after %v", claimedAt, before)
+	}
+	if _, ok := products.claimedAt["blue"]; ok {
+		t.Errorf("non-limited product should not be claimed")
+	}
+}
+
+func TestCreateOrder_MultipleLimitedProducts_ClaimedInSortedIDOrder(t *testing.T) {
+	orderedLongAgo := time.Now().Add(-2 * time.Hour)
+	limitedB := &model.Product{ID: "b-limited", Name: "B", Price: "10.00", IsLimited: true, LastOrderAt: &orderedLongAgo}
+	limitedA := &model.Product{ID: "a-limited", Name: "A", Price: "10.00", IsLimited: true, LastOrderAt: &orderedLongAgo}
+
+	products := newFakeProductRepository(limitedB, limitedA)
+	orders := &fakeOrderRepository{}
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
+
+	// Requested in "b then a" order; claims should still happen sorted by
+	// ID ("a-limited" before "b-limited") to keep lock order consistent
+	// across concurrent orders touching the same products.
+	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
+		Items: []port.CreateOrderItemInput{
+			{ProductID: "b-limited", Quantity: 1},
+			{ProductID: "a-limited", Quantity: 1},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got, want := products.claimOrder, []string{"a-limited", "b-limited"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("claim order = %v, want %v", got, want)
+	}
+}
+
+func TestCreateOrder_ClaimFails_OrderNotPersisted(t *testing.T) {
+	recentlyOrdered := time.Now().Add(-30 * time.Minute)
+	limitedRed := &model.Product{ID: "red", Name: "Red", Price: "50.00", IsLimited: true, LastOrderAt: &recentlyOrdered}
+
+	products := newFakeProductRepository(limitedRed, blue)
+	orders := &fakeOrderRepository{}
+	svc := NewOrderService(products, newFakeUnitOfWork(orders, products), testLogger())
+
+	_, err := svc.CreateOrder(context.Background(), port.CreateOrderInput{
+		Items: []port.CreateOrderItemInput{
+			{ProductID: "red", Quantity: 1},
+			{ProductID: "blue", Quantity: 1},
+		},
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.ErrorCode != apperror.ErrProductLimited.ErrorCode {
+		t.Fatalf("expected ErrProductLimited, got %v", err)
+	}
+	if orders.created != nil {
+		t.Errorf("order should not have been persisted when a limited-product claim fails")
 	}
 }
 

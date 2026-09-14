@@ -9,10 +9,43 @@ import (
 	"context"
 )
 
+const claimLimitedProduct = `-- name: ClaimLimitedProduct :one
+UPDATE products
+SET last_order_at = now()
+WHERE id = $1
+  AND is_limited = true
+  AND (
+    last_order_at IS NULL
+    OR last_order_at <= now() - INTERVAL '1 hour'
+  )
+RETURNING id, name, price, is_limited, last_order_at
+`
+
+// Atomically claims a limited product for an order: last_order_at is only
+// advanced to now() if the product is actually limited and its previous
+// last_order_at (if any) is already outside the 1-hour cooldown. Postgres
+// locks the row for the duration of this statement, so a concurrent claim
+// for the same product waits for this transaction to commit or roll back,
+// then re-evaluates the WHERE clause against the now-committed value --
+// exactly one concurrent claimant can ever win within a given hour.
+// Zero rows returned means the product is still in its cooldown window.
+func (q *Queries) ClaimLimitedProduct(ctx context.Context, id string) (Product, error) {
+	row := q.db.QueryRow(ctx, claimLimitedProduct, id)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Price,
+		&i.IsLimited,
+		&i.LastOrderAt,
+	)
+	return i, err
+}
+
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (name, price)
 VALUES ($1, $2)
-RETURNING id, name, price
+RETURNING id, name, price, is_limited, last_order_at
 `
 
 type CreateProductParams struct {
@@ -23,12 +56,18 @@ type CreateProductParams struct {
 func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
 	row := q.db.QueryRow(ctx, createProduct, arg.Name, arg.Price)
 	var i Product
-	err := row.Scan(&i.ID, &i.Name, &i.Price)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Price,
+		&i.IsLimited,
+		&i.LastOrderAt,
+	)
 	return i, err
 }
 
 const getProductByID = `-- name: GetProductByID :one
-SELECT id, name, price
+SELECT id, name, price, is_limited, last_order_at
 FROM products
 WHERE id = $1
 `
@@ -36,12 +75,18 @@ WHERE id = $1
 func (q *Queries) GetProductByID(ctx context.Context, id string) (Product, error) {
 	row := q.db.QueryRow(ctx, getProductByID, id)
 	var i Product
-	err := row.Scan(&i.ID, &i.Name, &i.Price)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Price,
+		&i.IsLimited,
+		&i.LastOrderAt,
+	)
 	return i, err
 }
 
 const listProducts = `-- name: ListProducts :many
-SELECT id, name, price
+SELECT id, name, price, is_limited, last_order_at
 FROM products
 ORDER BY id
 `
@@ -55,7 +100,13 @@ func (q *Queries) ListProducts(ctx context.Context) ([]Product, error) {
 	var items []Product
 	for rows.Next() {
 		var i Product
-		if err := rows.Scan(&i.ID, &i.Name, &i.Price); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Price,
+			&i.IsLimited,
+			&i.LastOrderAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -25,7 +25,9 @@ type OrderItem struct {
 }
 
 type Product struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Price string `json:"price"`
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Price       string             `json:"price"`
+	IsLimited   bool               `json:"is_limited"`
+	LastOrderAt pgtype.Timestamptz `json:"last_order_at"`
 }

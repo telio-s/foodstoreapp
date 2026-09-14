@@ -31,7 +31,7 @@ func main() {
 			NewValidator,
 			providePostgresPool,
 			postgres.NewProductRepository,
-			postgres.NewOrderRepository,
+			postgres.NewUnitOfWork,
 			service.NewProductService,
 			service.NewOrderService,
 			handler.NewProductHandler,

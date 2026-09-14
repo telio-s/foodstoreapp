@@ -27,6 +27,15 @@ paths:
   /order:
     post:
       summary: Create an order
+      description: >-
+        Order pricing is always computed server-side and never trusted from
+        the client. Two independent discounts apply, computed against the
+        pre-discount subtotal and summed (they do not compound): a 5% pair
+        discount for `Orange`, `Pink`, and `Green` (every complete pair of
+        the same product), and an additional 10% member discount whenever
+        `member_card_number` is provided. Limited products (e.g. `Red`) can
+        be ordered by at most one customer per hour; an order referencing a
+        limited product still within its cooldown is rejected in full.
       operationId: createOrder
       tags: [orders]
       requestBody:
@@ -43,17 +52,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/CreateOrderResponse"
         "400":
-          description: Invalid request
+          description: >-
+            Invalid request: request body failed validation, the order had
+            no items, or a limited product is still within its 1-hour
+            ordering cooldown.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validation:
+                  summary: Request validation failed
+                  value:
+                    code: -9000
+                    msg: "request validation failed"
+                    error: ["items is required"]
+                emptyOrder:
+                  summary: Order has no items
+                  value:
+                    code: -1000
+                    msg: "order must contain at least one item"
+                limitedProduct:
+                  summary: Limited product still in its 1-hour cooldown
+                  value:
+                    code: -1002
+                    msg: "product is limited to one order per hour"
         "404":
           description: Product not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: -1001
+                msg: "product not found"
         "500":
           description: Internal error
           content:
@@ -95,10 +127,19 @@ components:
       properties:
         code:
           type: integer
+          description: >-
+            Stable error code: -9000 for request validation failures,
+            -1000/-1001/-1002 for expected business errors (see the /order
+            responses below), or -9999 for an unexpected internal error.
           example: 1
         msg:
           type: string
           example: "product not found"
+        error:
+          type: array
+          description: Per-field validation failure messages, present only for -9000 (request validation failed).
+          items:
+            type: string
     CreateOrderItemRequest:
       type: object
       required: [product_id, quantity]

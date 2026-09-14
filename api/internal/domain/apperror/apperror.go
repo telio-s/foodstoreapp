@@ -79,4 +79,9 @@ var (
 	// ErrProductNotFound is returned by OrderService.CreateOrder when an
 	// order line references a product that doesn't exist.
 	ErrProductNotFound = &AppError{Code: CodeNotFound, ErrorCode: -1001, Message: "product not found"}
+
+	// ErrProductLimited is returned by OrderService.CreateOrder when an
+	// order line references a limited product (e.g. Red) that was already
+	// ordered by another customer within the last hour.
+	ErrProductLimited = &AppError{Code: CodeInvalid, ErrorCode: -1002, Message: "product is limited to one order per hour"}
 )
