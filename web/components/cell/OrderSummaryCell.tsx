@@ -70,7 +70,7 @@ export function OrderSummaryCell() {
 
         <SummaryCard title="Total (before discount)">
           <p className="text-lg font-bold text-zinc-900">
-            ${subtotal.toFixed(2)}
+            ฿{subtotal.toFixed(2)}
           </p>
         </SummaryCard>
 
@@ -84,7 +84,7 @@ export function OrderSummaryCell() {
                 <span>
                   {item.name} x{item.quantity}
                 </span>
-                <span>${(item.price * item.quantity).toFixed(2)}</span>
+                <span>฿{(item.price * item.quantity).toFixed(2)}</span>
               </div>
             ))}
           </div>
@@ -95,12 +95,12 @@ export function OrderSummaryCell() {
             <div className="flex flex-col gap-1 text-zinc-600">
               <div className="flex justify-between">
                 <span>Pair discount</span>
-                <span>-${pairDiscount.toFixed(2)}</span>
+                <span>-฿{pairDiscount.toFixed(2)}</span>
               </div>
               {cart.memberCardNumber && (
                 <div className="flex justify-between">
                   <span>Discount from Member Card</span>
-                  <span>-${memberDiscount.toFixed(2)}</span>
+                  <span>-฿{memberDiscount.toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -110,7 +110,7 @@ export function OrderSummaryCell() {
         {result && (
           <SummaryCard title="Final Total">
             <p className="text-lg font-bold text-zinc-900">
-              ${totalPrice.toFixed(2)}
+              ฿{totalPrice.toFixed(2)}
             </p>
           </SummaryCard>
         )}

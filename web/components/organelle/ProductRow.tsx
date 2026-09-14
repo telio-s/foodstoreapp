@@ -13,7 +13,7 @@ export function ProductRow({ product, quantity, onChange }: ProductRowProps) {
       <div className="flex-1">
         <p className="font-medium text-zinc-900">{product.name}</p>
         <p className="text-zinc-500">
-          ${parseFloat(product.price ?? "0").toFixed(2)}
+          ฿{parseFloat(product.price ?? "0").toFixed(2)}
         </p>
       </div>
       <div className="flex items-center gap-3">
